@@ -1,0 +1,84 @@
+---
+- name: install wireguard tools
+  package:
+      name: wireguard-tools
+      state: present
+
+- name: extract ip out of net-cidr
+  set_fact:
+    wireguard_ip: "{{ wireguard_cidr.split('/')[0] }}"
+    wireguard_subnet: "{{ wireguard_cidr.split('/')[1] }}"
+
+- name: check if wireguard interface exists  # noqa 301 306
+  shell: ip -br link | grep -c {{ wireguard_interface }}
+  failed_when: false
+  register: wg_interface
+
+- name: add wireguard interface  # noqa 301
+  command: ip link add dev {{ wireguard_interface }} type wireguard
+  when: wg_interface.stdout == '0'
+
+- name: get ip addr on {{ wireguard_interface }}  # noqa 301 306
+  shell: >
+    ip -br addr | grep {{ wireguard_interface }} |
+    grep -c {{ wireguard_ip }}/{{ wireguard_subnet }}
+  register: wg_interface_ip
+
+- name: configure wireguard ip address  # noqa 301
+  command: >
+      ip addr add dev {{ wireguard_interface }}
+      {{ wireguard_ip }}/{{ wireguard_subnet }}
+  when: wg_interface_ip == '0'
+
+- name: check if private key exists
+  stat:
+      path: "{{ wireguard_privatekey_file }}"
+  register: _privkey
+
+- name: create wireguard directory for priv key
+  file:
+    state: directory
+    path: "{{ wireguard_privatekey_file | dirname }}"
+    owner: root
+    group: root
+    mode: 0770
+
+- debug: var=_privkey
+
+- name: create private key  # noqa 301
+  shell: wg genkey > {{ wireguard_privatekey_file }}
+  when: not _privkey.stat.exists or wireguard_force_create_key
+
+- name: set pubkey path
+  set_fact:
+      wireguard_pubkey_file: "{{ wireguard_privatekey_file }}.pub"
+
+- name: create public key  # noqa 301 306
+  shell: >
+    wg pubkey
+    < {{ wireguard_privatekey_file }}
+    | tee {{ wireguard_pubkey_file }}
+  register: wireguard_pubkey
+
+- name: configure wireguard  # noqa 301
+  command: >
+    wg set {{ wireguard_interface }}
+    listen-port {{ wireguard_listen_port }}
+    private-key {{ wireguard_privatekey_file }}
+
+# block must surround the loop, else the loop is evaluated before the
+# conditional but maybe this is not true and the when clause can be added
+# directly to every task
+- block:
+    - name: set allowed_ips fact
+      set_fact:
+            wireguard_allowed_ips: "{{ wireguard_allowed_ips|default([]) + hostvars[item]['ansible_facts']['eth0']['ipv4']['address']+'/32' }}"
+      loop: '{{ groups["wireguard"] }}'
+
+    - name: configure wireguard peers  # noqa 301
+      command: >
+        wg set peer {{ hostvars[item].wireguard_pubkey.stdout }}
+        allowed-ips {{ allowed_ips.join(',') }}
+        endpoint {{ item.ansible_facts.eth0.ipv4.address }}
+      loop: '{{ groups["wireguard"] }}'
+  when: "'wireguard' in groups"

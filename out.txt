@@ -1,0 +1,46 @@
+--> Test matrix
+    
+└── default
+    ├── dependency
+    ├── create
+    ├── prepare
+    └── converge
+    
+--> Scenario: 'default'
+--> Action: 'dependency'
+Skipping, missing the requirements file.
+Skipping, missing the requirements file.
+--> Scenario: 'default'
+--> Action: 'create'
+Skipping, instances already created.
+--> Scenario: 'default'
+--> Action: 'prepare'
+Skipping, prepare playbook not configured.
+--> Scenario: 'default'
+--> Action: 'converge'
+--> Sanity checks: 'docker'
+    
+    PLAY [Converge] ****************************************************************
+    
+    TASK [Gathering Facts] *********************************************************
+    [0;32mok: [gentoo-amd64][0m
+    
+    TASK [Include ansible-role-wireguard] ******************************************
+    
+    TASK [ansible-role-wireguard : get current kernel version] *********************
+    [0;32mok: [gentoo-amd64][0m
+    
+    TASK [ansible-role-wireguard : set kernel version] *****************************
+    [0;32mok: [gentoo-amd64][0m
+    
+    TASK [ansible-role-wireguard : install kernel source] **************************
+    [0;32mok: [gentoo-amd64][0m
+    
+    TASK [ansible-role-wireguard : check if kernel config exists] ******************
+    [0;32mok: [gentoo-amd64][0m
+    
+    TASK [ansible-role-wireguard : copy current kernel config from kernel to linux sources] ***
+    
+    PLAY RECAP *********************************************************************
+    [0;31mgentoo-amd64[0m               : [0;32mok=5   [0m changed=0    unreachable=0    [0;31mfailed=1   [0m skipped=0    rescued=0    ignored=0
+    

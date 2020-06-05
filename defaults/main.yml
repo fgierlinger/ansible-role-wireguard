@@ -14,3 +14,15 @@ wireguard_privatekey_file: /root/.wireguard/wireguard_key
 
 # force the (re)creation of the private and the public key
 wireguard_force_create_key: false
+
+# boolean if initramfs should be generated with genkernel
+wireguard_genkernel: false
+
+# options to add when building the initramfs
+wireguard_genkernel_opts: --lvm --luks
+
+# boolean if grub should be generated
+wireguard_grub: false
+
+# boolean if server should be rebooted after kernel tasks
+wireguard_reboot_after_kernel: true

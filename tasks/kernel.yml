@@ -1,0 +1,95 @@
+---
+- name: get current kernel version  # noqa 305
+  shell: uname -r
+  register: kernel_version
+  when: wireguard_kernel_version is undefined
+  changed_when: false
+  check_mode: false
+
+- name: set kernel version
+  set_fact:
+    wireguard_kernel_version: "{{ kernel_version.stdout }}"
+  when: wireguard_kernel_version is undefined
+
+- name: install kernel source
+  portage:
+    package: "=gentoo-sources-{{ wireguard_kernel_version.replace('-gentoo', '') }}"
+    state: present
+
+- name: check if kernel config exists
+  stat:
+      path: '/usr/src/linux-{{ wireguard_kernel_version }}/.config'
+  register: kernel_config
+
+- name: copy current kernel config from kernel to linux sources
+  shell: >
+    gunzip -c /proc/config.gz > /usr/src/linux-{{ wireguard_kernel_version }}/.config
+  when: not kernel_config.stat.exists
+
+- name: kernel | make oldconfig  # noqa 301
+  command: make oldconfig
+  args:
+    chdir: /usr/src/linux
+
+- name: kernel | make modules_prepare  # noqa 301
+  command: make modules_prepare
+  args:
+    chdir: /usr/src/linux
+
+- name: build kernel  # noqa 301
+  command: make -j {{ ansible_processor_vcpus }} all
+  args:
+    chdir: /usr/src/linux
+
+- name: install kernel  # noqa 301
+  command: make install
+  args:
+    chdir: /usr/src/linux
+
+- name: install modules  # noqa 301
+  command: make modules_install
+  args:
+    chdir: /usr/src/linux
+  register: modules_installed
+
+- name: unmask unstable wireguard packages
+  lineinfile:
+      path: /etc/portage/package.accept_keywords
+      line: '>=net-vpn/wireguard-modules-1.0.20200520 ~amd64'
+      create: true
+
+- name: install wireguard modules
+  package:
+      name: wireguard-modules
+      state: present
+
+- name: rebuild modules  # noqa 503
+  command: emerge --oneshot @module-rebuild
+  when: modules_installed.changed
+
+- name: create initramfs
+  command: genkernel {{ wireguard_genkernel_opts }} --install initramfs
+  when: wireguard_genkernel
+
+- name: regenerate grub.cfg
+  command: grub-mkconfig -o /boot/grub/grub.cfg
+  when: wireguard_grub
+
+- name: create directory for loadable modules
+  file:
+    state: directory
+    path: /etc/modules-load.d/
+
+- name: ensure wireguard module is loaded at boot
+  lineinfile:
+      path: /etc/modules-load.d/wireguard.conf
+      line: wireguard
+      create: true
+
+- name: reboot server
+  reboot:
+  when: wireguard_reboot_after_kernel
+
+- name: try to load wireguard module since reboot is skipped
+  command: modprobe wireguard
+  when: not wireguard_reboot_after_kernel

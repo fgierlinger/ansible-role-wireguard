@@ -6,7 +6,7 @@ services: docker
 addons:
   apt:
     packages:
-    - python-pip
+      - python-pip
 
 install:
   # Install ansible

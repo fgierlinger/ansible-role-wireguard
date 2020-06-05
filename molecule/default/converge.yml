@@ -1,6 +1,9 @@
 ---
 - name: Converge
   hosts: all
+  vars:
+      wireguard_reboot_after_kernel: false
+      wireguard_cidr: '10.0.0.1/24'
   tasks:
     - name: "Include ansible-role-wireguard"
       include_role:
