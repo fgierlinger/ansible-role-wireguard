@@ -1,0 +1,16 @@
+---
+# name of the ip interface to be created
+wireguard_interface: wg0
+
+# number denoting the subnet mask of the wireguard ip address
+# eg 24 for 192.168.0.2/24
+wireguard_subnet: 24
+
+# port on wjich wireguard listens for connections
+wireguard_listen_port: 51820
+
+# file (including path) where the private key should be stored
+wireguard_privatekey_file: /root/.wireguard/wireguard_key
+
+# force the (re)creation of the private and the public key
+wireguard_force_create_key: false

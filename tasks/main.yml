@@ -1,0 +1,39 @@
+---
+- name: install wireguard
+  package:
+    name : ['wireguard-tools', 'wireguard-modules']
+    state: present
+    
+- name: add wireguard interface
+  command: ip link add dev {{ wireguard_interface }} type wireguard
+    
+- name: configure wireguard ip address
+  command: ip addr add dev {{ wireguard_interface }} {{ wireguard_ip }}/{{ wireguard_subnet }}
+
+- name: check if private key eyists
+  stat:
+    path: {{ wireguard_privatekey_file }}
+  register: _privkey
+    
+- name: create private key
+  command: wg genkey >> {{ wireguard_privatekey_file }}
+  when: _privkey.stat.exists or wireguard_force_create_key
+  
+- name: create public key
+  command: wg pubkey < {{ wireguard_privatekey_file }} > {{ wireguard_privatekey_file }}.pub
+  
+- name: configure wireguard
+  command: wg set {{ wireguard_interface }} listen-port {{ wireguard_listen_port }} private-key {{ wireguard_privatekey_file }}
+
+- name: set pubkey fact
+  set_fact:
+    wireguard_pubkey: "{{ lookup('file', wireguard_privkey_file+'.pub' }}"
+
+- name: set allowed_ips fact
+  set_fact:
+    wireguard_allowed_ips: '{{ wireguard_allowed_ips|default([]) + [hostvars[item]['ansible_facts']['eth0']['ipv4']['address']/32] }}'
+  loop: '{{ groups["wireguard"] }}'
+
+- name: configure wireguard peers
+  command: wg set peer {{ hostvars[item].wireguard_pubkey }} allowed-ips {{ allowed_ips.join(',') }} endpoint {{ item.ansible_facts.eth0.ipv4.address }}
+  loop: '{{ groups["wireguard"] }}'
